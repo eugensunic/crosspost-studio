@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sunic Publishing — one script, three modes.
+# Crosspost Studio — one script, three modes.
 #
 #   publish.sh --mode video      raw.mp4 "Naslov"  [--shorts 12:40-13:35 27:10-28:05] [--lang hr] [--short-only]
 #   publish.sh --mode appearance "https://…htv…" "Tom on HTV: …" [--host HTV] [--lang hr]

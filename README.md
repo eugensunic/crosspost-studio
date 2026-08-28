@@ -1,4 +1,4 @@
-# Sunic Publishing
+# Crosspost Studio
 
 Everything Tom produces or appears in — own videos, HTV/podcast appearances, the monthly live Q&A — goes out to
 YouTube, X, LinkedIn, Facebook, Instagram, Telegram and tomsunic.com from **one command**, captioned in the other

@@ -1,4 +1,4 @@
-# Sunic Publishing Playbook
+# Crosspost Studio — Playbook
 
 Dated 29 Aug 2026, with Tom's decisions folded in. Strategy document; `README.md` is the operator's manual.
 
