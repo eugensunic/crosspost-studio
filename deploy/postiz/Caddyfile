@@ -1,0 +1,12 @@
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 4GB
+	}
+	reverse_proxy postiz:5000 {
+		transport http {
+			read_timeout 30m
+			write_timeout 30m
+		}
+	}
+}

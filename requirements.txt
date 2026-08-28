@@ -1,0 +1,7 @@
+pyyaml>=6.0
+mlx-whisper>=0.4
+auto-editor>=26.0
+captacity>=0.3
+google-api-python-client>=2.150
+google-auth-oauthlib>=1.2
+python-substack>=0.1.14

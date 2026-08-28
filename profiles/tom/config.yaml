@@ -1,0 +1,65 @@
+# Profile: Tom Sunic — edit once, used by every script.
+name: "Dr. Tom Sunic"
+slug_prefix: ""
+languages:
+  spoken_default: hr           # auto-detected by Whisper; this is the fallback
+  subtitle_targets: [en, fr, de]
+  title_langs: [hr, en]
+
+# Fixed weekly release slot for own videos (Postiz queue). ISO weekday 1=Mon.
+schedule:
+  weekday: 4
+  hour: "18:00"
+  timezone: "Europe/Zagreb"
+
+site:
+  repo: "~/tomsunic.com"
+  base_url: "https://tomsunic.com"
+  posts_dir: "docs/posts"
+  appearances_dir: "docs/appearances"
+
+postiz:
+  url: "https://REPLACE.duckdns.org"      # public HTTPS name of your Postiz
+  # integration IDs from GET /public/v1/integrations — fill after connecting accounts
+  integrations:
+    youtube: ""
+    x: ""
+    linkedin: ""
+    facebook: ""
+    instagram: ""
+    telegram: ""
+
+youtube:
+  channel_id: ""
+  handle: "@DrTomSunic"
+  default_privacy: "unlisted"    # switch to "public" after the first successful test run
+
+substack:
+  publication: "tomsunic.substack.com"
+  paid_only_for_live: true
+
+whisper:
+  model: "mlx-community/whisper-large-v3-turbo"   # try "mlx-community/whisper-large-v3-mlx" if Croatian quality is poor
+
+ollama:
+  model: "gemma3:12b"
+
+# Appended to every description, post and site page — in this order.
+links:
+  site: "https://tomsunic.com"
+  substack: "https://tomsunic.substack.com"
+  kofi: "https://ko-fi.com/REPLACE"
+  books: "https://tomsunic.com/books/"
+  paypal: "https://paypal.me/REPLACE"
+  iban: "HRxx xxxx xxxx xxxx xxxx x"
+  x: "https://x.com/REPLACE"
+  linkedin: "https://www.linkedin.com/in/tomsunic"
+  facebook: "https://www.facebook.com/REPLACE"
+  telegram: "https://t.me/REPLACE"
+
+# Every outgoing link carries UTM tags so Substack/Ko-fi signups can be traced per network.
+utm: true
+
+closing_line:
+  hr: "Svi videi i eseji: tomsunic.com — newsletter: Substack."
+  en: "Full videos and essays: tomsunic.com — newsletter: Substack."
