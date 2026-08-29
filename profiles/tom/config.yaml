@@ -39,7 +39,7 @@ substack:
   paid_only_for_live: true
 
 whisper:
-  model: "mlx-community/whisper-large-v3-turbo"   # try "mlx-community/whisper-large-v3-mlx" if Croatian quality is poor
+  model: "mlx-community/whisper-large-v3-mlx"   # turbo is faster but noticeably weaker on Croatian
 
 ollama:
   # 4b, not 12b: this model picks clip spans, writes titles and translates subtitles — none of

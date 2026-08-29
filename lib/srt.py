@@ -43,5 +43,35 @@ def to_seconds(ts: str) -> float:
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
 
 
+def from_seconds(t: float) -> str:
+    h, rem = divmod(max(0.0, t), 3600)
+    m, s = divmod(rem, 60)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{int(round((s - int(s)) * 1000)):03d}"
+
+
+def resplit(cues: list[Cue], max_words: int) -> list[Cue]:
+    """Break long cues into short caption lines, sharing each cue's time by word count.
+
+    Subtitles are translated a whole sentence at a time, because a translator handed
+    three-word fragments produces nonsense. Captions have to be short to be readable, so the
+    sentence is cut up again afterwards.
+    """
+    out: list[Cue] = []
+    for c in cues:
+        words = c.text.split()
+        if not words:
+            continue
+        start, end = to_seconds(c.start), to_seconds(c.end)
+        span = max(end - start, 0.001)
+        chunks = [words[i:i + max_words] for i in range(0, len(words), max_words)]
+        used = 0
+        for chunk in chunks:
+            a = start + span * used / len(words)
+            used += len(chunk)
+            b = start + span * used / len(words)
+            out.append(Cue(len(out) + 1, from_seconds(a), from_seconds(b), " ".join(chunk)))
+    return out
+
+
 def plain_text(cues: list[Cue]) -> str:
     return " ".join(c.text for c in cues)

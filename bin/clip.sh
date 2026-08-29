@@ -123,6 +123,11 @@ for span in "${SPANS[@]}"; do
     [ -f "${base}.srt" ] || "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
       --language "$LANG_" --word-timestamps True --max-words-per-line 3 --output-format srt \
       --output-dir "$WORK" --output-name "clip_${i}" >/dev/null 2>&1
+    # A second pass at sentence level. Only the caption pass wants three-word lines; the
+    # translator needs whole sentences or it has no grammar to work from.
+    [ -f "${base}_sent.srt" ] || "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
+      --language "$LANG_" --output-format srt \
+      --output-dir "$WORK" --output-name "clip_${i}_sent" >/dev/null 2>&1  # no dot: mlx_whisper truncates at it
     rm -f "${base}.wav"
     echo "  ⚠ check ${base}.srt before this goes anywhere"
   fi
@@ -130,9 +135,8 @@ for span in "${SPANS[@]}"; do
   # English subtitles for the Substack cut. Whisper cannot do this: the turbo model is
   # transcription-only, and its translate task returns the source language unchanged.
   if [ ! -f "${base}.en.srt" ] && [ "$LANG_" != "en" ]; then
-    if "$PY" "$ROOT/lib/translate_srt.py" "${base}.srt" --to en --src-lang "$LANG_" >/dev/null 2>&1 \
-       && [ -f "$WORK/en.srt" ]; then
-      mv "$WORK/en.srt" "${base}.en.srt"
+    if "$PY" "$ROOT/lib/translate_srt.py" "${base}_sent.srt" --to en --src-lang "$LANG_" \
+         --resplit 3 --out "${base}.en.srt" >/dev/null 2>&1 && [ -f "${base}.en.srt" ]; then
       echo "  ⚠ machine translation — read ${base}.en.srt before this goes anywhere"
     else
       echo "  ! no English subtitles: translate_srt.py needs Ollama and a pulled model."
