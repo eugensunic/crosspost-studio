@@ -59,6 +59,15 @@ A local file works in place of a URL.
 .venv/bin/python lib/facebook_post.py --message "..." --link "https://vijesti.hrt.hr/..."
 .venv/bin/python lib/facebook_post.py --check          # is the token still good
 
+# Telegram channel
+PYTHONPATH=lib .venv/bin/python lib/telegram_post.py --message "..." --video <file>
+PYTHONPATH=lib .venv/bin/python lib/telegram_post.py --check
+
+# YouTube
+PYTHONPATH=lib .venv/bin/python lib/youtube_upload.py <file> --title "..." \
+  --channel-id UCI8I-1QsJIVQ1vralwI-IYw
+PYTHONPATH=lib .venv/bin/python lib/youtube_upload.py --check
+
 # Substack: draft built around a YouTube video (it embeds, it cannot upload)
 PYTHONPATH=lib .venv/bin/python lib/substack_post.py --work work/<slug> --video-url "https://youtu.be/<id>"
 
@@ -67,7 +76,9 @@ PYTHONPATH=lib .venv/bin/python lib/substack_post.py --work work/<slug> --video-
 .venv/bin/python lib/shrink.py <file> --preset substack     # 45MB, 1080x1920
 ```
 
-Credentials live in `.env`. Never on a command line.
+Credentials live in `.env`. Never on a command line. Setup guides, one each:
+`YOUTUBE-SETUP.md`, `FACEBOOK-SETUP.md`, `TELEGRAM-SETUP.md`. WhatsApp has no API at all and
+`WHATSAPP.md` explains why, plus the twenty-second manual route.
 
 ## Odds and ends
 
