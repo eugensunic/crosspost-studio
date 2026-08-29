@@ -9,7 +9,7 @@ brew list ollama >/dev/null 2>&1 || brew install ollama
 brew list uv >/dev/null 2>&1 || brew install uv
 
 # Python 3.11/3.12 venv — mlx-whisper and captacity do not support 3.14 yet.
-uv venv --python 3.12 "$ROOT/.venv"
+uv venv --clear --python 3.12 "$ROOT/.venv"
 # shellcheck disable=SC1091
 source "$ROOT/.venv/bin/activate"
 uv pip install -r "$ROOT/requirements.txt"

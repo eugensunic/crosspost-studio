@@ -76,18 +76,29 @@ log "4/8 Titles, description, summary (bilingual)"
 "$PY" "$ROOT/lib/titles.py" "$WORK/transcript.txt" --langs $(cfg languages.title_langs | tr -d "[],'") --title "$TITLE" --spoken "$LANG_" --mode "$MODE"
 
 log "5/8 Shorts / teaser"
+# lib/polish.py does the cut-to-vertical, the overlay clean-up, the burned-in subtitles and
+# the title card in one ffmpeg pass. See POLISHING.md. It replaces the old crop + captacity
+# pair: captacity imports moviepy.editor (removed in moviepy 2.x) so it could never run, and
+# its failure was swallowed by `2>/dev/null ||`, shipping Shorts with no captions at all.
+secs() { "$PY" -c "import sys;p=sys.argv[1].split(':');print(sum(float(x)*60**i for i,x in enumerate(reversed(p))))" "$1"; }
+polish() {  # polish <src> <out> <offset-seconds>
+  "$PY" "$ROOT/lib/polish.py" "$1" --work "$WORK" --out "$2" --srt-offset "$3" \
+    ${SRT_IN:+--srt "$SRT_IN"} --title "$TITLE"
+}
+SRT_IN="$WORK/$LANG_.srt"; [ -f "$SRT_IN" ] || SRT_IN=""
+
 if [ "$MODE" = live ]; then
   [ -n "$TEASER" ] || { echo "--teaser MM:SS-MM:SS required for live"; exit 1; }
-  ffmpeg -y -loglevel error -ss "${TEASER%-*}" -to "${TEASER#*-}" -i "$WORK/clean.mp4" -vf "crop=ih*9/16:ih,scale=1080:1920" -c:a copy "$WORK/teaser_raw.mp4"
-  captacity "$WORK/teaser_raw.mp4" "$WORK/teaser.mp4" 2>/dev/null || cp "$WORK/teaser_raw.mp4" "$WORK/teaser.mp4"
+  ffmpeg -y -loglevel error -ss "${TEASER%-*}" -to "${TEASER#*-}" -i "$WORK/clean.mp4" -c:v libx264 -crf 18 -c:a aac "$WORK/teaser_src.mp4"
+  polish "$WORK/teaser_src.mp4" "$WORK/teaser.mp4" "$(secs "${TEASER%-*}")"
 else
   if [ ${#SHORTS[@]} -eq 0 ]; then
     mapfile -t SHORTS < <("$PY" -c "import json;[print(f\"{s['start']}-{s['end']}\") for s in json.load(open('$WORK/meta.json')).get('short_candidates',[])[:2]]")
     echo "  using LLM-picked spans: ${SHORTS[*]}"
   fi
   i=1; for span in "${SHORTS[@]}"; do
-    ffmpeg -y -loglevel error -ss "${span%-*}" -to "${span#*-}" -i "$WORK/clean.mp4" -vf "crop=ih*9/16:ih,scale=1080:1920" -c:a copy "$WORK/short_${i}_raw.mp4"
-    captacity "$WORK/short_${i}_raw.mp4" "$WORK/short_${i}.mp4" 2>/dev/null || cp "$WORK/short_${i}_raw.mp4" "$WORK/short_${i}.mp4"
+    ffmpeg -y -loglevel error -ss "${span%-*}" -to "${span#*-}" -i "$WORK/clean.mp4" -c:v libx264 -crf 18 -c:a aac "$WORK/short_${i}_src.mp4"
+    polish "$WORK/short_${i}_src.mp4" "$WORK/short_${i}.mp4" "$(secs "${span%-*}")"
     i=$((i+1))
   done
   [ "$SHORT_ONLY" = 1 ] || cp -n "$WORK/clean.mp4" "$WORK/long.mp4"
