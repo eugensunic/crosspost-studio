@@ -14,10 +14,15 @@ then renders every one twice:
 
 ```
 work/<date>-<slug>/
-  whatsapp/  short_N_<slug>.mp4      Croatian subtitles and title
-             short_N_<slug>.wa.mp4   the one you actually upload: under 30s, under 10MB
-  substack/  short_N_<slug>.mp4      English subtitles and title, full quality
+  youtube/   short_N_<slug>.mp4   Croatian subtitles and title, full quality
+  facebook/  short_N_<slug>.mp4   same file
+  telegram/  short_N_<slug>.mp4   same file (a bot may not send over 50MB)
+  whatsapp/  short_N_<slug>.mp4   same cut, under 30s and under 10MB
+  substack/  short_N_<slug>.mp4   English subtitles and title
 ```
+
+One folder per destination, so uploading is "open the folder for the place you are posting to".
+The first three are hard links to one file, so five folders cost one copy on disk.
 
 **Then check the Croatian.** Edit `clip_N.srt` (and `clip_N.en.srt`) in the work folder and run
 the same command again. The download, the cuts and the transcription are cached, so only the

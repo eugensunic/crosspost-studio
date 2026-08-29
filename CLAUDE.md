@@ -12,12 +12,16 @@ commit when asked.
 
 ## Language, per destination
 
-Every clip is rendered **twice**, into its own folder under `work/<date>-<slug>/`:
+Every clip is rendered **twice** and filed into one folder per destination under
+`work/<date>-<slug>/`:
 
 | Folder | Subtitles and title card | Sized for |
 |---|---|---|
-| `whatsapp/` | the spoken language, normally Croatian | under 30 s and under 10 MB |
-| `substack/` | **always English** | full quality, no cap |
+| `youtube/` `facebook/` `telegram/` | the spoken language, normally Croatian | full quality |
+| `whatsapp/` | the spoken language | under 30 s and under 10 MB |
+| `substack/` | **always English** | full quality |
+
+The spoken-language folders are hard links to one file, so the copies are free.
 
 Substack is English throughout: burned-in subtitles, the title card on the video, and the post.
 Never substitute the Croatian cut, and never ship only one of the two. `bin/clip.sh` does both.

@@ -11,8 +11,10 @@
 #   bin/clip.sh <url|file> --slug <name> \
 #       --clip 00:54-01:29 "Carinski naslov || English title" \
 #       --clip 05:55-06:31 "Drugi naslov || Second English title"
-#       → each span is rendered twice: whatsapp/ with spoken-language subtitles and title
-#         (under 30s, under 10MB), substack/ with English subtitles and title, full quality.
+#       → one folder per destination under work/<date>-<slug>/:
+#           youtube/ facebook/ telegram/  spoken language, full quality
+#           whatsapp/                     same cut, under 30s and under 10MB
+#           substack/                     English subtitles and title
 #         Titles are "spoken || English"; with no ||, the same title is used for both.
 #
 # Everything is cached in work/<date>-<slug>/: re-running does not re-download or re-transcribe.
@@ -100,12 +102,20 @@ PY
   exit 0
 fi
 
-# ── 5. cut, transcribe tight, render both versions ───────────────────────────
-# Every span goes out twice, into its own folder:
-#   whatsapp/  spoken-language subtitles and title, under 30s and under 10MB
+# ── 5. cut, transcribe tight, render per destination ─────────────────────────
+# One folder per place it goes. Two renders underneath: the spoken-language cut and the English
+# one. The other folders are hard links to the same file, so five destinations cost one copy.
+#
+#   youtube/   spoken language, full quality
+#   facebook/  same file
+#   telegram/  same file (a bot may not send over 50MB)
+#   whatsapp/  same cut, re-encoded under 30s and under 10MB
 #   substack/  English subtitles and title, full quality
-# English comes from Whisper's translate task, which works off the audio and keeps the timings.
-mkdir -p "$WORK/whatsapp" "$WORK/substack"
+DESTS="youtube facebook telegram whatsapp substack"
+for d in $DESTS; do mkdir -p "$WORK/$d"; done
+
+link_or_copy() { ln -f "$1" "$2" 2>/dev/null || cp -f "$1" "$2"; }
+
 i=1
 for span in "${SPANS[@]}"; do
   raw="${TITLES[$((i-1))]}"
@@ -114,18 +124,19 @@ for span in "${SPANS[@]}"; do
   [ "$title_en" = "$raw" ] && title_en="$title"
   start="$(secs "${span%-*}")"; end="$(secs "${span#*-}")"
   base="$WORK/clip_${i}"
+  name="short_${i}_${SLUG}.mp4"
   log "Clip $i: $span — $title"
   [ -f "${base}_src.mp4" ] || ffmpeg -y -loglevel error -ss "$start" -to "$end" -i "$SOURCE" \
       -c:v libx264 -crf 18 -preset medium -c:a aac -b:a 192k "${base}_src.mp4"
 
-  if [ ! -f "${base}.srt" ] || [ ! -f "${base}.en.srt" ]; then
+  if [ ! -f "${base}.srt" ]; then
     ffmpeg -y -loglevel error -i "${base}_src.mp4" -vn -ac 1 -ar 16000 "${base}.wav"
-    [ -f "${base}.srt" ] || "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
+    "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
       --language "$LANG_" --word-timestamps True --max-words-per-line 3 --output-format srt \
       --output-dir "$WORK" --output-name "clip_${i}" >/dev/null 2>&1
     # A second pass at sentence level. Only the caption pass wants three-word lines; the
     # translator needs whole sentences or it has no grammar to work from.
-    [ -f "${base}_sent.srt" ] || "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
+    "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
       --language "$LANG_" --output-format srt \
       --output-dir "$WORK" --output-name "clip_${i}_sent" >/dev/null 2>&1  # no dot: mlx_whisper truncates at it
     rm -f "${base}.wav"
@@ -145,20 +156,23 @@ for span in "${SPANS[@]}"; do
   fi
 
   "$PY" "$ROOT/lib/polish.py" "${base}_src.mp4" --work "$WORK" --srt "${base}.srt" \
-    --title "$title" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/whatsapp/short_${i}_${SLUG}.mp4"
-  "$PY" "$ROOT/lib/shrink.py" "$WORK/whatsapp/short_${i}_${SLUG}.mp4" --preset whatsapp \
-    --out "$WORK/whatsapp/short_${i}_${SLUG}.wa.mp4"
+    --title "$title" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/youtube/$name"
+  link_or_copy "$WORK/youtube/$name" "$WORK/facebook/$name"
+  link_or_copy "$WORK/youtube/$name" "$WORK/telegram/$name"
+  "$PY" "$ROOT/lib/shrink.py" "$WORK/youtube/$name" --preset whatsapp --out "$WORK/whatsapp/$name"
 
   if [ -f "${base}.en.srt" ]; then
     "$PY" "$ROOT/lib/polish.py" "${base}_src.mp4" --work "$WORK" --srt "${base}.en.srt" \
-      --title "$title_en" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/substack/short_${i}_${SLUG}.mp4"
+      --title "$title_en" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/substack/$name"
   fi
   i=$((i+1))
 done
 
 echo
 echo "Done → $WORK"
-ls -1 "$WORK"/short_*.mp4 2>/dev/null || true
+for d in $DESTS; do
+  for f in "$WORK/$d"/*.mp4; do [ -f "$f" ] && printf '  %-9s %s (%s)\n' "$d" "$(basename "$f")" "$(du -h "$f" | cut -f1)"; done
+done
 echo
 echo "Rights: if this is a broadcaster's footage it stays theirs — publish as --mode appearance"
 echo "(text + link, no re-upload) unless you have written permission. See step 0 of the docs."
