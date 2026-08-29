@@ -42,7 +42,9 @@ whisper:
   model: "mlx-community/whisper-large-v3-turbo"   # try "mlx-community/whisper-large-v3-mlx" if Croatian quality is poor
 
 ollama:
-  model: "gemma3:12b"
+  # 4b, not 12b: this model picks clip spans, writes titles and translates subtitles — none of
+  # which need a large model, and 12b is 8.1 GB against 3.3 GB. Raise it if the picks disappoint.
+  model: "gemma3:4b"
 
 # Appended to every description, post and site page — in this order.
 links:

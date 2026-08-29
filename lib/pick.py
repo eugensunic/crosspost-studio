@@ -34,40 +34,48 @@ TEMPLATE = """Transcript of a TV interview, one line per cue, timestamps are MM:
 
 {transcript}
 
-Choose the {n} best moments to cut as standalone vertical short videos.
+Choose the single best moment in this passage to cut as a standalone vertical short video.
+
+Give only the timestamp where each moment BEGINS. Do not give an end time; the clip is
+extended automatically to the end of the thought. So pick the line where the speaker starts
+saying the thing worth hearing, and make sure it is the beginning of a sentence.
 
 Rules:
-- each clip is one idea, complete in itself
-- {lo}-{hi} seconds long
-- must begin exactly at the start of a spoken sentence
-- must end on the point being made, not mid-thought
-- no two clips may overlap or make the same point
+- each moment is one idea that stands on its own and needs no earlier context
+- prefer a concrete claim, number or quotation over generalities
+- ignore anything that reads like a transcription error, and never put such a word in a title
 
-For each, write a title in {language}: a short claim of at most 6 words, the thing that makes
-someone stop scrolling. Not a topic label. No quotation marks in the title.
+For each write two titles, each a short claim of at most 6 words, the thing that makes someone
+stop scrolling. Not a topic label, no quotation marks, sentence case not Title Case.
+  title     written in {language}, and ONLY in {language}
+  title_en  the same claim written in English
 
 Answer with JSON only:
-{{"clips": [{{"start": "MM:SS", "end": "MM:SS", "title": "...", "why": "one sentence"}}]}}"""
+{{"clips": [{{"start": "MM:SS", "title": "...", "title_en": "...", "why": "one sentence"}}]}}"""
 
 LANGUAGES = {"hr": "Croatian", "en": "English", "fr": "French", "de": "German"}
 
 
-def transcript_lines(srt: Path) -> tuple[str, float]:
-    """Timestamped one-line-per-cue text, plus the end of the last cue in seconds."""
+def load_cues(srt: Path) -> list[tuple[float, float, str]]:
     def secs(t: str) -> float:
         hh, mm, rest = t.split(":")
         ss, ms = rest.split(",")
         return int(hh) * 3600 + int(mm) * 60 + int(ss) + int(ms) / 1000
 
-    out, last = [], 0.0
+    cues = []
     for block in re.split(r"\n\s*\n", srt.read_text(encoding="utf-8").strip()):
         rows = [r for r in block.splitlines() if r.strip()]
         if len(rows) >= 3 and "-->" in rows[1]:
             a, b = [x.strip() for x in rows[1].split("-->")]
-            st, en = secs(a), secs(b)
-            last = max(last, en)
-            out.append(f"{int(st // 60):02d}:{int(st % 60):02d} " + " ".join(rows[2:]))
-    return "\n".join(out), last
+            cues.append((secs(a), secs(b), " ".join(rows[2:])))
+    return cues
+
+
+def transcript_lines(srt: Path) -> tuple[str, float]:
+    """Timestamped one-line-per-cue text, plus the end of the last cue in seconds."""
+    cues = load_cues(srt)
+    body = "\n".join(f"{int(s // 60):02d}:{int(s % 60):02d} {t}" for s, _, t in cues)
+    return body, (cues[-1][1] if cues else 0.0)
 
 
 def to_secs(stamp: str) -> float | None:
@@ -78,23 +86,48 @@ def to_secs(stamp: str) -> float | None:
     return int(a) * 3600 + int(b) * 60 + int(c) if c else int(a) * 60 + int(b)
 
 
-def validate(clips: list[dict], duration: float, lo: int, hi: int) -> list[dict]:
-    """Drop what the model got wrong: bad stamps, zero or runaway lengths, overlaps, and
-    anything past the end of the recording. A small model gets some of these wrong every run."""
+ENDS_SENTENCE = re.compile(r"[.!?]['\"]?\s*$")
+MIN_GAP = 90  # seconds between picks: a small model clusters them all in the opening minutes
+
+
+def snap(cues: list[tuple[float, float, str]], anchor: float, lo: int, hi: int):
+    """Turn the model's anchor into a real span.
+
+    The model is good at spotting the moment and hopeless at timestamp arithmetic, so it only
+    supplies a start. Here the start is pulled back to the beginning of its sentence, and the
+    end is walked forward to the first sentence boundary past the minimum length.
+    """
+    i = min(range(len(cues)), key=lambda k: abs(cues[k][0] - anchor))
+    while i > 0 and not ENDS_SENTENCE.search(cues[i - 1][2]):
+        i -= 1
+    start = cues[i][0]
+    j = i
+    while j + 1 < len(cues):
+        if cues[j][1] - start >= lo and ENDS_SENTENCE.search(cues[j][2]):
+            break
+        if cues[j][1] - start >= hi:
+            break
+        j += 1
+    return start, cues[j][1]
+
+
+def validate(clips: list[dict], cues, duration: float, lo: int, hi: int) -> list[dict]:
+    """Drop what the model got wrong: bad stamps, overlaps, anything past the end."""
     good: list[dict] = []
     for c in clips:
-        st, en = to_secs(str(c.get("start", ""))), to_secs(str(c.get("end", "")))
+        anchor = to_secs(str(c.get("start", "")))
         title = str(c.get("title", "")).strip().strip('"').strip()
-        if st is None or en is None or not title:
+        title_en = str(c.get("title_en", "")).strip().strip('"').strip() or title
+        if anchor is None or not title or anchor >= duration:
             continue
-        en = min(en, duration)
-        if not (lo * 0.6 <= en - st <= hi * 1.4) or st >= duration:
+        st, en = snap(cues, anchor, lo, hi)
+        if en - st < lo * 0.6:
             continue
-        if any(st < g["end_s"] and en > g["start_s"] for g in good):
+        if any(abs(st - g["start_s"]) < MIN_GAP for g in good):
             continue
         good.append({"start": f"{int(st // 60):02d}:{int(st % 60):02d}",
                      "end": f"{int(en // 60):02d}:{int(en % 60):02d}",
-                     "start_s": st, "end_s": en, "title": title,
+                     "start_s": st, "end_s": en, "title": title, "title_en": title_en,
                      "why": str(c.get("why", "")).strip()})
     return sorted(good, key=lambda g: g["start_s"])
 
@@ -109,34 +142,45 @@ def main() -> None:
     a = ap.parse_args()
 
     srt = Path(a.srt)
+    cues = load_cues(srt)
     text, duration = transcript_lines(srt)
     if not text:
         raise SystemExit(f"no cues in {srt}")
 
-    prompt = TEMPLATE.format(transcript=text, n=a.n, lo=a.min, hi=a.max,
-                             language=LANGUAGES.get(a.lang, a.lang))
-    try:
-        raw = ollama(prompt, system=SYSTEM, json_mode=True)
-    except OSError as e:
-        raise SystemExit(
-            f"could not reach Ollama ({e}). Start it with `brew services start ollama` "
-            f"and pull the model named in config.yaml: `ollama pull {CFG['ollama']['model']}`")
+    # One call per window rather than one call for the whole interview. Asked for three from
+    # thirteen minutes, a small model returns three moments from the first three minutes and
+    # stops reading; asked for the best moment in one passage, it answers about that passage.
+    clips = []
+    window = duration / a.n
+    for k in range(a.n):
+        lo_t, hi_t = k * window, (k + 1) * window
+        part = "\n".join(line for line in text.splitlines()
+                          if lo_t <= to_secs(line[:5]) < hi_t) if text else ""
+        if not part.strip():
+            continue
+        prompt = TEMPLATE.format(transcript=part, n=1, lo=a.min, hi=a.max,
+                                 language=LANGUAGES.get(a.lang, a.lang))
+        try:
+            raw = ollama(prompt, system=SYSTEM, json_mode=True)
+        except OSError as e:
+            raise SystemExit(
+                f"could not reach Ollama ({e}). Start it with `brew services start ollama` "
+                f"and pull the model named in config.yaml: `ollama pull {CFG['ollama']['model']}`")
+        try:
+            clips += json.loads(raw).get("clips", [])[:1]
+        except json.JSONDecodeError:
+            print(f"  window {k + 1}: model did not return JSON, skipped")
 
-    try:
-        clips = json.loads(raw).get("clips", [])
-    except json.JSONDecodeError:
-        raise SystemExit(f"model did not return JSON:\n{raw[:400]}")
-
-    picks = validate(clips, duration, a.min, a.max)
+    picks = validate(clips, cues, duration, a.min, a.max)
     if not picks:
         raise SystemExit("nothing usable came back — pick by hand from the transcript instead")
 
     write_json(srt.parent / "picks.json", {"clips": picks})
     for p in picks:
-        print(f'--clip {p["start"]}-{p["end"]} "{p["title"]}"')
+        print(f'--clip {p["start"]}-{p["end"]} "{p["title"]} || {p["title_en"]}"')
     print(f"\n  {len(picks)} of {a.n} kept → {srt.parent / 'picks.json'}")
     for p in picks:
-        print(f'  {p["start"]}-{p["end"]}  {p["title"]}  — {p["why"]}')
+        print(f'  {p["start"]}-{p["end"]}  {p["title"]} / {p["title_en"]}')
 
 
 if __name__ == "__main__":
