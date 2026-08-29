@@ -9,9 +9,11 @@
 #         Needs a model: `ollama pull gemma3:4b`. Check what it chose — it is a mediocre judge.
 #
 #   bin/clip.sh <url|file> --slug <name> \
-#       --clip 00:54-01:29 "Carinski rat je i jezični rat" \
-#       --clip 05:55-06:31 "Trump: Britanija ubija svoju civilizaciju"
-#       → cuts each span, cleans it, burns in subtitles, holds the title, writes short_N_<slug>.mp4
+#       --clip 00:54-01:29 "Carinski naslov || English title" \
+#       --clip 05:55-06:31 "Drugi naslov || Second English title"
+#       → each span is rendered twice: whatsapp/ with spoken-language subtitles and title
+#         (under 30s, under 10MB), substack/ with English subtitles and title, full quality.
+#         Titles are "spoken || English"; with no ||, the same title is used for both.
 #
 # Everything is cached in work/<date>-<slug>/: re-running does not re-download or re-transcribe.
 #
@@ -98,25 +100,55 @@ PY
   exit 0
 fi
 
-# ── 5. cut, transcribe tight, polish ─────────────────────────────────────────
+# ── 5. cut, transcribe tight, render both versions ───────────────────────────
+# Every span goes out twice, into its own folder:
+#   whatsapp/  spoken-language subtitles and title, under 30s and under 10MB
+#   substack/  English subtitles and title, full quality
+# English comes from Whisper's translate task, which works off the audio and keeps the timings.
+mkdir -p "$WORK/whatsapp" "$WORK/substack"
 i=1
 for span in "${SPANS[@]}"; do
-  title="${TITLES[$((i-1))]}"
+  raw="${TITLES[$((i-1))]}"
+  title="${raw%%||*}"; title="${title% }"
+  title_en="${raw#*||}"; title_en="${title_en# }"
+  [ "$title_en" = "$raw" ] && title_en="$title"
   start="$(secs "${span%-*}")"; end="$(secs "${span#*-}")"
   base="$WORK/clip_${i}"
   log "Clip $i: $span — $title"
   [ -f "${base}_src.mp4" ] || ffmpeg -y -loglevel error -ss "$start" -to "$end" -i "$SOURCE" \
       -c:v libx264 -crf 18 -preset medium -c:a aac -b:a 192k "${base}_src.mp4"
-  if [ ! -f "${base}.srt" ]; then
+
+  if [ ! -f "${base}.srt" ] || [ ! -f "${base}.en.srt" ]; then
     ffmpeg -y -loglevel error -i "${base}_src.mp4" -vn -ac 1 -ar 16000 "${base}.wav"
-    "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" --language "$LANG_" \
-      --word-timestamps True --max-words-per-line 3 --output-format srt \
+    [ -f "${base}.srt" ] || "$ROOT/.venv/bin/mlx_whisper" "${base}.wav" --model "$(model)" \
+      --language "$LANG_" --word-timestamps True --max-words-per-line 3 --output-format srt \
       --output-dir "$WORK" --output-name "clip_${i}" >/dev/null 2>&1
     rm -f "${base}.wav"
-    echo "  ⚠ check the Croatian in ${base}.srt before this goes anywhere"
+    echo "  ⚠ check ${base}.srt before this goes anywhere"
   fi
+
+  # English subtitles for the Substack cut. Whisper cannot do this: the turbo model is
+  # transcription-only, and its translate task returns the source language unchanged.
+  if [ ! -f "${base}.en.srt" ] && [ "$LANG_" != "en" ]; then
+    if "$PY" "$ROOT/lib/translate_srt.py" "${base}.srt" --to en --src-lang "$LANG_" >/dev/null 2>&1 \
+       && [ -f "$WORK/en.srt" ]; then
+      mv "$WORK/en.srt" "${base}.en.srt"
+      echo "  ⚠ machine translation — read ${base}.en.srt before this goes anywhere"
+    else
+      echo "  ! no English subtitles: translate_srt.py needs Ollama and a pulled model."
+      echo "    Substack cut skipped — see MEMORY: Substack is always English."
+    fi
+  fi
+
   "$PY" "$ROOT/lib/polish.py" "${base}_src.mp4" --work "$WORK" --srt "${base}.srt" \
-    --title "$title" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/short_${i}_${SLUG}.mp4"
+    --title "$title" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/whatsapp/short_${i}_${SLUG}.mp4"
+  "$PY" "$ROOT/lib/shrink.py" "$WORK/whatsapp/short_${i}_${SLUG}.mp4" --preset whatsapp \
+    --out "$WORK/whatsapp/short_${i}_${SLUG}.wa.mp4"
+
+  if [ -f "${base}.en.srt" ]; then
+    "$PY" "$ROOT/lib/polish.py" "${base}_src.mp4" --work "$WORK" --srt "${base}.en.srt" \
+      --title "$title_en" ${POSTOP[@]+"${POSTOP[@]}"} --out "$WORK/substack/short_${i}_${SLUG}.mp4"
+  fi
   i=$((i+1))
 done
 
