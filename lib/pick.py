@@ -137,8 +137,11 @@ def main() -> None:
     ap.add_argument("srt")
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--lang", default="hr")
-    ap.add_argument("--min", type=int, default=35)
-    ap.add_argument("--max", type=int, default=75)
+    # 45-75s is the rule of thumb in the docs, and it is right for a YouTube Short. But one
+    # span feeds both renders, and WhatsApp Status refuses anything over 30s — so 30s binds,
+    # and a span that respects it is never trimmed mid-sentence afterwards.
+    ap.add_argument("--min", type=int, default=20)
+    ap.add_argument("--max", type=int, default=28)
     a = ap.parse_args()
 
     srt = Path(a.srt)
