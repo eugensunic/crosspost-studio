@@ -68,6 +68,10 @@ PYTHONPATH=lib .venv/bin/python lib/youtube_upload.py <file> --title "..." \
   --channel-id UCI8I-1QsJIVQ1vralwI-IYw
 PYTHONPATH=lib .venv/bin/python lib/youtube_upload.py --check
 
+# LinkedIn (text and link; token expires every 60 days)
+PYTHONPATH=lib .venv/bin/python lib/linkedin_post.py --text "$(cat post.txt)" --link "..."
+PYTHONPATH=lib .venv/bin/python lib/linkedin_post.py --check
+
 # Substack: draft built around a YouTube video (it embeds, it cannot upload)
 PYTHONPATH=lib .venv/bin/python lib/substack_post.py --work work/<slug> --video-url "https://youtu.be/<id>"
 
@@ -77,7 +81,7 @@ PYTHONPATH=lib .venv/bin/python lib/substack_post.py --work work/<slug> --video-
 ```
 
 Credentials live in `.env`. Never on a command line. Setup guides, one each:
-`YOUTUBE-SETUP.md`, `FACEBOOK-SETUP.md`, `TELEGRAM-SETUP.md`. WhatsApp has no API at all and
+`YOUTUBE-SETUP.md`, `FACEBOOK-SETUP.md`, `TELEGRAM-SETUP.md`, `LINKEDIN.md`. WhatsApp has no API at all and
 `WHATSAPP.md` explains why, plus the twenty-second manual route.
 
 ## Odds and ends
