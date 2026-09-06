@@ -39,6 +39,14 @@ Applies to anything published under Tom's name: Substack posts, social copy, tit
 * The intro names the **real topics with their specifics** (figures, place names), never a
   generic "I spoke about migration", and never a meta line like "this is the part where I said
   X".
+* **One copy file per clip, next to the video.** Every `short_N_<slug>.mp4` in every
+  destination folder gets a `short_N_<slug>.txt` beside it with the copy for that destination:
+  title, description and tags for `youtube/`, post text for `facebook/` and `telegram/`, the
+  status line for `whatsapp/`, English title and summary for `substack/`. A combined `POSTS.md`
+  is fine as an overview but is not a substitute; the copy has to travel with the file. [2026-09-06]
+* **LinkedIn gets one post per source, not one per clip.** One hook for the whole interview,
+  the HRT title and link, hashtags, saved as `linkedin.txt` in the work folder root. Never
+  three LinkedIn texts for three clips. [2026-09-06]
 
 ## Rights, before anything is published
 
