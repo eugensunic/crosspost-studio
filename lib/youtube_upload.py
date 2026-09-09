@@ -60,7 +60,10 @@ def service():
                     f"from console.cloud.google.com and save it there. See this file's header.")
             flow = InstalledAppFlow.from_client_secrets_file(str(CLIENT_SECRET), SCOPES)
             print("  a browser will open once, to authorise this machine")
-            creds = flow.run_local_server(port=0)
+            # select_account forces the chooser even when the browser is already signed in:
+            # without it Google binds whichever account happens to be active, and a token for
+            # the wrong channel looks identical to a working one until the first upload.
+            creds = flow.run_local_server(port=0, prompt="select_account consent")
         TOKEN.write_text(creds.to_json(), encoding="utf-8")
         TOKEN.chmod(0o600)
     return build("youtube", "v3", credentials=creds)
