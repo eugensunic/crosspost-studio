@@ -6,11 +6,14 @@ to meet, `CLAUDE.md` the working conventions.
 ## The one you will use
 
 ```
-bin/clip.sh "<article url>" --slug sunic-kanada --auto 3
+bin/clip.sh "<article url>"  --slug sunic-kanada  --auto 3
+bin/clip.sh "<youtube url>"  --slug sunic-desnica --auto 3
 ```
 
-Downloads the video, transcribes it, picks three moments, titles each in Croatian and English,
-then renders every one twice:
+An article page, a YouTube link, or a local file. Broadcaster pages have the media URL in their
+HTML and are scraped; YouTube, Vimeo, Rumble and the rest build the stream in JavaScript, so
+those go through yt-dlp. Either way it downloads the video, transcribes it, picks the moments,
+titles each in Croatian and English, then renders every one twice:
 
 ```
 work/<date>-<slug>/

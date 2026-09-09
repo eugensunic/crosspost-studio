@@ -7,6 +7,8 @@ command -v brew >/dev/null || { echo "install Homebrew first: https://brew.sh"; 
 brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
 brew list ollama >/dev/null 2>&1 || brew install ollama
 brew list uv >/dev/null 2>&1 || brew install uv
+# yt-dlp: the way in for YouTube and every other player that has no scrapable media URL.
+brew list yt-dlp >/dev/null 2>&1 || brew install yt-dlp
 
 # Python 3.11/3.12 venv — mlx-whisper and captacity do not support 3.14 yet.
 uv venv --clear --python 3.12 "$ROOT/.venv"
