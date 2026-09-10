@@ -33,6 +33,23 @@ CAP_SIZE, CAP_BAND_H, CAP_Y, CAP_WRAP = 68, 240, 1330, 22
 TITLE_SIZE, TITLE_BAND_H, TITLE_Y, TITLE_WRAP = 78, 400, 270, 18
 TITLE_IN, TITLE_HOLD = 0.3, 3.6
 
+# The same clip as a normal 16:9 video instead of a Short: the picture fills the canvas, the
+# captions sit at the bottom of the picture and the title over its top.
+FORMATS = {
+    "short":     dict(out=(1080, 1920), cap=(68, 240, 1330, 22), title=(78, 400, 270, 18)),
+    # Talking heads sit high in a 16:9 frame, so the title is one line hugging the top edge.
+    "landscape": dict(out=(1920, 1080), cap=(52, 180, 870, 60), title=(60, 120, 14, 52)),
+}
+
+
+def set_format(name: str) -> None:
+    global OUT_W, OUT_H, CAP_SIZE, CAP_BAND_H, CAP_Y, CAP_WRAP
+    global TITLE_SIZE, TITLE_BAND_H, TITLE_Y, TITLE_WRAP
+    f = FORMATS[name]
+    OUT_W, OUT_H = f["out"]
+    CAP_SIZE, CAP_BAND_H, CAP_Y, CAP_WRAP = f["cap"]
+    TITLE_SIZE, TITLE_BAND_H, TITLE_Y, TITLE_WRAP = f["title"]
+
 # overlay detection
 SAMPLE_FPS = 5.0
 SCAN_SECONDS = 14.0        # window the temporal median is built from
@@ -367,7 +384,10 @@ def main() -> None:
     ap.add_argument("--title-pos", choices=["band", "over"], default="band",
                     help="band: in the blurred area above the picture; over: on the picture")
     ap.add_argument("--no-clean", action="store_true", help="skip overlay removal")
+    ap.add_argument("--format", choices=sorted(FORMATS), default="short",
+                    help="short: 1080x1920 vertical; landscape: 1920x1080 normal video")
     a = ap.parse_args()
+    set_format(a.format)
 
     src, work = Path(a.input), Path(a.work)
     work.mkdir(parents=True, exist_ok=True)

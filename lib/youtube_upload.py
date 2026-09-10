@@ -35,8 +35,9 @@ from pathlib import Path
 
 from common import CFG, ROOT
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload",
-          "https://www.googleapis.com/auth/youtube.readonly"]
+# Full scope: upload, read, and edit what is already there (tags, titles, thumbnails).
+# upload+readonly alone cannot call videos.update, which fixing tags after the fact needs.
+SCOPES = ["https://www.googleapis.com/auth/youtube"]
 CLIENT_SECRET = ROOT / "client_secret.json"
 TOKEN = ROOT / ".yt_token.json"
 
