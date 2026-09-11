@@ -78,12 +78,49 @@ def whoami(yt) -> dict:
     return items[0]
 
 
+def upload(yt, f: Path, title: str, description: str, tags: list[str], privacy: str,
+           thumbnail: Path | None = None) -> str:
+    """Resumable upload, then the thumbnail. Returns the video id. Used by yt_publish.py too."""
+    from googleapiclient.errors import HttpError
+    from googleapiclient.http import MediaFileUpload
+
+    body = {"snippet": {"title": title[:100], "description": description,
+                        "tags": tags, "categoryId": "25"},
+            "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False}}
+    media = MediaFileUpload(str(f), chunksize=8 * 1024 * 1024, resumable=True,
+                            mimetype="video/mp4")
+    req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+    res = None
+    while res is None:
+        status, res = req.next_chunk()
+        if status:
+            print(f"\r  {int(status.progress() * 100)}%", end="", file=sys.stderr, flush=True)
+    print()
+    vid = res["id"]
+    print(f"  uploaded: https://www.youtube.com/watch?v={vid}")
+    print(f"  studio:   https://studio.youtube.com/video/{vid}/edit")
+    if thumbnail:
+        # 50 quota units. Fails with "forbidden" on a channel that has not verified a phone
+        # number; the upload itself is unaffected, so report rather than raise.
+        try:
+            yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(
+                str(thumbnail), mimetype="image/jpeg"
+                if thumbnail.suffix.lower() in (".jpg", ".jpeg") else "image/png")).execute()
+            print(f"  thumbnail: {thumbnail.name}")
+        except HttpError as e:
+            print(f"  ! thumbnail not set ({e.resp.status}): verify the channel's phone number "
+                  f"in YouTube Studio, then set it by hand")
+    return vid
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Upload a video to YouTube.")
     ap.add_argument("video", nargs="?", default="")
     ap.add_argument("--title", default="")
     ap.add_argument("--description", default="")
     ap.add_argument("--tags", nargs="*", default=[])
+    ap.add_argument("--thumbnail", default="",
+                    help="JPEG/PNG under 2 MB, set after the upload (needs a phone-verified channel)")
     ap.add_argument("--privacy", choices=["private", "unlisted", "public"],
                     default=CFG["youtube"]["default_privacy"])
     ap.add_argument("--channel-id", default="", help="refuse to upload unless this channel matches")
@@ -118,24 +155,8 @@ def main() -> None:
         if input(f"  upload to {name} now? [y/N] ").strip().lower() not in ("y", "yes"):
             return print("  not uploaded")
 
-    from googleapiclient.http import MediaFileUpload
-
-    body = {"snippet": {"title": title[:100], "description": a.description,
-                        "tags": a.tags, "categoryId": "25"},
-            "status": {"privacyStatus": a.privacy, "selfDeclaredMadeForKids": False}}
-    media = MediaFileUpload(str(f), chunksize=8 * 1024 * 1024, resumable=True,
-                            mimetype="video/mp4")
-    req = yt.videos().insert(part="snippet,status", body=body, media_body=media)
-
-    res = None
-    while res is None:
-        status, res = req.next_chunk()
-        if status:
-            print(f"\r  {int(status.progress() * 100)}%", end="", file=sys.stderr, flush=True)
-    print()
-    vid = res["id"]
-    print(f"  uploaded: https://www.youtube.com/watch?v={vid}")
-    print(f"  studio:   https://studio.youtube.com/video/{vid}/edit")
+    upload(yt, f, title, a.description, a.tags, a.privacy,
+           Path(a.thumbnail) if a.thumbnail else None)
     if a.privacy != "public":
         print(f"  it is {a.privacy}. Check the Copyright tab for a Content ID claim before "
               f"making it public.")

@@ -3,7 +3,7 @@
 work/*
 !work/.gitkeep
 client_secret.json
-.yt_token.json
+.yt_token.json*
 deploy/postiz/.env
 *.mp4
 *.mov

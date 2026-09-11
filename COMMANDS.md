@@ -3,6 +3,70 @@
 The short list. `README.md` is the full operator's manual, `POLISHING.md` the rules a clip has
 to meet, `CLAUDE.md` the working conventions.
 
+## YouTube in two commands
+
+One command makes the clips, one command posts them. Worked example, with the Informer
+interview from 10 September 2026:
+
+```
+# 1. Clips into the work folder. Downloads, transcribes, cuts, captions, and writes the
+#    YouTube title, description, tags and thumbnail beside every clip.
+bin/clip.sh "https://www.youtube.com/watch?v=SZIK-StxUzk" --slug tajne-svetog-pisma --auto 4
+
+# 2. Post them. Reads the .txt beside each clip; nothing else to type.
+bin/yt-upload.sh work/20260910-tajne-svetog-pisma
+```
+
+Step 1 leaves this behind:
+
+```
+work/20260910-tajne-svetog-pisma/
+  full.srt                              transcript of the whole recording, with timecodes
+  youtube/
+    short_1_tajne-svetog-pisma.mp4      the clip, 1080x1920, Croatian captions, title card
+    short_1_tajne-svetog-pisma.txt      TITLE / DESCRIPTION / TAGS / THUMBNAIL for that clip
+    short_1_tajne-svetog-pisma.jpg      thumbnail, a frame with the title card on it
+    short_2_...                         and so on
+```
+
+Between the two commands, open the `.txt` files. The title comes from the pick, the
+description is a draft made of the clip's own words, so make it two or three punchy
+sentences. Fix Croatian mistakes in `clip_N.srt` and re-run step 1; the download and the
+transcript are cached, only the render repeats. A clip whose `.txt` lacks a title,
+description, tags or thumbnail is refused by step 2, so nothing goes out half-filled.
+
+Normal 16:9 videos, not Shorts, for the longer passages. Add `--video` spans; they land as
+`youtube/video_N_<slug>.mp4` with their own `.txt` and `.jpg`, and step 2 posts them the same
+way (without the #Shorts tag):
+
+```
+bin/clip.sh "https://www.youtube.com/watch?v=SZIK-StxUzk" --slug tajne-svetog-pisma --dest youtube \
+  --video 22:43-25:41 "Više komunista u Kaliforniji nego u Jugoslaviji" \
+  --video 01:15:58-01:20:27 "Hrvatska je danas karikatura one iz 1991."
+```
+
+Picking the moments yourself instead of `--auto`:
+
+```
+bin/clip.sh "https://www.youtube.com/watch?v=SZIK-StxUzk" --slug tajne-svetog-pisma \
+  --clip 03:12-04:05 "Što bi Hrvati bez Srba? || What would Croats do without Serbs?" \
+  --clip 09:43-10:25 "Identitet na broju žrtava || An identity built on a body count"
+```
+
+Step 2 remembers what it uploaded in `youtube/uploaded.json`, so running it again only sends
+new clips. It also checks each clip before anything is sent: title under 100 characters,
+description and tags present, thumbnail file present, and the signed-in channel is the one in
+`config.yaml`. Step 1 checks the clip edges (opens on a sentence, closes on a full stop, no
+repeated Whisper lines) and prints a warning per clip when something is off.
+
+**Thumbnails need a one-time step in YouTube Studio.** The API refuses a custom thumbnail
+(403) until the channel has verified a phone number: Studio → Settings → Channel → Feature
+eligibility → Intermediate features → Verify phone number. Until then the upload succeeds and
+the thumbnail has to be set by hand from the `.jpg` beside the clip. Uploads are unlisted by default (`config.yaml`): check the Copyright tab in Studio,
+then `bin/yt-upload.sh work/<folder> --privacy public` next time, or flip them in Studio.
+Quota is about six uploads a day; when it runs out the command stops and tells you, and the
+next run picks up where it left off.
+
 ## The one you will use
 
 ```
