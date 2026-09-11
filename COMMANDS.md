@@ -3,6 +3,27 @@
 The short list. `README.md` is the full operator's manual, `POLISHING.md` the rules a clip has
 to meet, `CLAUDE.md` the working conventions.
 
+## YouTube in one command
+
+```
+bin/yt.sh "https://www.youtube.com/watch?v=YQoug8JTIGo" --slug tito-diktator
+```
+
+Downloads, transcribes, lets the local model pick five Shorts (45 to 75 s) and two longer
+passages (3 to 5 min, normal 16:9), cuts and captions them, writes title, description, tags
+and thumbnail beside each, and uploads them unlisted. `--shorts 3 --videos 1` changes the
+count, `--no-upload` stops before the upload so the copy can be read first, and anything else
+(`--lang`, `--clip`, `--video`) is passed through to `bin/clip.sh`.
+
+It is the same as the two commands below with `--auto 5 --auto-videos 2 --dest youtube
+--upload`, so everything said there about the work folder, the ledger and the quota holds.
+What it does not do is judge: the local model is a mediocre picker and its Croatian is rough,
+so the description is a draft written by it, not a transcript dump, and a wrong word in
+`clip_N.srt` goes out burned in. Reading the `.txt` files and the captions before the upload
+is still the difference between good and passable; use `--no-upload`, fix, then
+`bin/yt-upload.sh work/<folder>`. Better picks and copy come from a larger model:
+`ollama pull gemma3:12b` and set `ollama.model` in `profiles/tom/config.yaml`.
+
 ## YouTube in two commands
 
 One command makes the clips, one command posts them. Worked example, with the Informer

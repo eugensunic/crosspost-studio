@@ -31,6 +31,7 @@ postiz:
 
 youtube:
   channel_id: ""
+  title_suffix: "Tomislav Sunić"   # every title ends "| Tomislav Sunić, <show>"
   handle: "@DrTomSunic"
   default_privacy: "unlisted"    # switch to "public" after the first successful test run
 

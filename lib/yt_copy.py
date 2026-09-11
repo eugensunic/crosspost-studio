@@ -8,10 +8,10 @@ Produces short_1_<slug>.txt in the shape bin/yt-upload.sh reads, and a thumbnail
 clip's opening seconds, while the title card is on screen. Runs only when the txt does not
 exist yet, so a hand-edited description is never overwritten by a re-render.
 
-The description is a first draft: the clip's own words from the sentence-level transcript,
-then the source link and credit. Read it before uploading; Whisper's Croatian needs checking,
-and a description is short (two or three sentences), so cut it down rather than ship a
-transcript dump.
+The description is written by the local Ollama model from the clip's sentence-level
+transcript: two or three first-person sentences naming the concrete claims, then the source
+link and credit. Without Ollama it falls back to the clip's own opening sentences. Read it
+before uploading when you can; Whisper's Croatian needs checking.
 """
 from __future__ import annotations
 
@@ -21,7 +21,51 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from common import CFG, read_json
+from common import CFG, ollama, read_json
+
+DESCRIBE = (
+    "You write YouTube descriptions for clips of a TV interview with {who}. Answer only with "
+    "JSON. Write in {language} and only in {language}. Never use an em dash or en dash, and "
+    "never use quotation marks around a whole sentence."
+)
+DESCRIBE_TEMPLATE = """Title of the clip: {title}
+
+What {who} says in the clip (a machine transcript, so ignore anything that looks like a
+transcription error):
+
+{body}
+
+Write, in {language}:
+  description  two or three sentences in the first person, as {who} speaking. Name the
+               concrete claims, figures, names and places from the clip. No preamble like
+               "in this clip". No hashtags, no links.
+  tags         six to ten search tags for this clip's actual topics: people, places, events,
+               concepts named in it. Specific, not generic words like "interview" or "video".
+
+Answer with JSON only: {{"description": "...", "tags": ["...", "..."]}}"""
+
+LANGUAGES = {"hr": "Croatian", "en": "English", "fr": "French", "de": "German"}
+
+
+def describe(title: str, body: str, who: str, lang: str) -> tuple[str, list[str]]:
+    """Description and tags from the local model; ("", []) when it is not running."""
+    import json
+    try:
+        raw = ollama(DESCRIBE_TEMPLATE.format(title=title, body=body, who=who,
+                                              language=LANGUAGES.get(lang, lang)),
+                     system=DESCRIBE.format(who=who, language=LANGUAGES.get(lang, lang)),
+                     json_mode=True)
+        data = json.loads(raw)
+    except (OSError, ValueError):
+        return "", []
+    desc = re.sub(r"\s*[—–]\s*", ", ", str(data.get("description", ""))).strip()
+    desc = re.sub(r"\s+", " ", desc)
+    # The model is told "two or three sentences, no preamble" and does not always listen.
+    parts = [x for x in re.split(r"(?<=[.!?])\s+", desc) if x]
+    parts = [x for x in parts if not re.match(r"^(U ovom|U ovoj|In this)\b", x)] or parts
+    desc = " ".join(parts[:3])
+    tags = [str(t).strip() for t in data.get("tags", []) if str(t).strip()][:10]
+    return desc, tags
 
 STOP = set("""i u a o s je su se da na za od do ne li kao što ali ili pa te iz po pri uz još samo
 sam smo ste si bi bih bio bila bili biti će ću ćemo ćete ovo to ono ovaj taj onaj ova ta ona ovi ti oni
@@ -70,6 +114,7 @@ def main() -> None:
     ap.add_argument("--srt", default="", help="sentence-level SRT of the clip")
     ap.add_argument("--source", default="", help="source.json from grab.py")
     ap.add_argument("--programme", default="", help="show name for the title suffix")
+    ap.add_argument("--lang", default=CFG["languages"]["spoken_default"])
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()
 
@@ -81,22 +126,30 @@ def main() -> None:
         return print(f"  kept {txt.name} (edit it by hand, or --force)")
 
     src = read_json(a.source) if a.source and Path(a.source).exists() else {}
-    who = CFG["name"].replace("Dr. ", "")
+    who = CFG["youtube"].get("title_suffix") or CFG["name"].replace("Dr. ", "")
     show = a.programme or src.get("uploader", "")
     title = a.title.strip()
     suffix = f" | {who}" + (f", {show}" if show else "")
     if len(title + suffix) <= 100:
         title += suffix
 
-    body = sentences(Path(a.srt)) if a.srt and Path(a.srt).exists() else ""
+    full = Path(a.srt).read_text(encoding="utf-8") if a.srt and Path(a.srt).exists() else ""
+    full = " ".join(r for b in re.split(r"\n\s*\n", full.strip())
+                    for r in [rr for rr in b.splitlines() if rr.strip()][2:])
+    body, model_tags = describe(a.title, full, who, a.lang) if full else ("", [])
+    if not body:
+        body = sentences(Path(a.srt)) if a.srt and Path(a.srt).exists() else ""
     lines = [body] if body else []
     if src.get("page"):
         lines.append(f"Cijeli razgovor: {src['page']}")
-    credit = ", ".join(x for x in (src.get("uploader", ""), src.get("title", ""),
+    # Broadcaster, show and date. The upload's own title only when it is short; a long one
+    # ("RENDEZVOUS - TOMISLAV SUNIĆ - ... (5.5.2026.)") is noise in a credit line.
+    src_title = src.get("title", "") if len(src.get("title", "")) <= 60 else ""
+    credit = ", ".join(x for x in (src.get("uploader", ""), a.programme or src_title,
                                    date_hr(src.get("date", ""))) if x)
     if credit:
         lines.append(f"Izvor: {credit}")
-    tags = keywords(f"{a.title} {body}") + ([show] if show else []) + CHANNEL_TAGS
+    tags = (model_tags or keywords(f"{a.title} {body}")) + ([show] if show else []) + CHANNEL_TAGS
     hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9ČĆĐŠŽčćđšž]", "", t.title()) for t in tags[:4])
     # #Shorts only on the vertical cut; a video_N_ file is a normal 16:9 upload.
     lines.append(hashtags if mp4.name.startswith("video_") else f"{hashtags} #Shorts")

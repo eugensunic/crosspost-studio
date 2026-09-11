@@ -8,6 +8,11 @@
 #       → the local model picks three moments and titles them, then cuts all three.
 #         Needs a model: `ollama pull gemma3:4b`. Check what it chose — it is a mediocre judge.
 #
+#   bin/clip.sh <url|file> --slug <name> --auto 5 --auto-videos 2 --dest youtube --upload
+#       → the whole YouTube run in one go: five Shorts and two normal 16:9 videos picked by
+#         the local model, copy written beside each, then bin/yt-upload.sh. bin/yt.sh is the
+#         short spelling of this line.
+#
 #   bin/clip.sh <url|file> --slug <name> --dest youtube
 #       → only the youtube/ folder (comma list for more: --dest youtube,telegram)
 #
@@ -36,7 +41,7 @@ PY="${PYTHON:-$ROOT/.venv/bin/python}"
 [ -x "$PY" ] || PY="python3"
 export PYTHONPATH="$ROOT/lib"
 
-SRC=""; SLUG=""; LANG_="hr"; AUTO=0; POSTOP=(); SPANS=(); TITLES=(); VSPANS=(); VTITLES=()
+SRC=""; SLUG=""; LANG_="hr"; AUTO=0; AUTOV=0; UPLOAD=0; POSTOP=(); SPANS=(); TITLES=(); VSPANS=(); VTITLES=()
 DESTS="youtube facebook telegram whatsapp substack"
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -46,6 +51,8 @@ while [ $# -gt 0 ]; do
     --clip)  SPANS+=("$2"); TITLES+=("${3:-}"); shift 3;;
     --video) VSPANS+=("$2"); VTITLES+=("${3:-}"); shift 3;;  # 16:9, not a Short
     --auto)  AUTO="$2"; shift 2;;
+    --auto-videos) AUTOV="$2"; shift 2;;   # N normal 16:9 videos, picked by the local model
+    --upload) UPLOAD=1; shift;;            # then bin/yt-upload.sh on the work folder
     --title-pos) POSTOP=(--title-pos "$2"); shift 2;;
     *) [ -z "$SRC" ] && SRC="$1" && shift || { echo "unexpected arg: $1"; exit 1; };;
   esac
@@ -83,17 +90,34 @@ else
 fi
 
 # ── 3. let the local model pick and title the moments ────────────────────────
+# Shorts run 45-75s for YouTube; when the WhatsApp cut is wanted too, one span feeds both and
+# WhatsApp Status stops at 30s, so 20-28s binds instead.
+# Videos first, so the Shorts are picked from what is left: a Short cut out of the middle of
+# a video is the same minute uploaded twice.
+AVOID=(); for span in ${VSPANS[@]+"${VSPANS[@]}"}; do AVOID+=(--avoid "$span"); done
+if [ "$AUTOV" -gt 0 ] && [ ${#VSPANS[@]} -eq 0 ]; then
+  log "Choosing $AUTOV longer passages for 16:9 videos (local model)"
+  while IFS= read -r line; do
+    [ "${line:0:7}" = "--video" ] || continue
+    span="$(echo "$line" | awk '{print $2}')"
+    title="$(echo "$line" | sed 's/^--video [^ ]* //; s/^"//; s/"$//')"
+    VSPANS+=("$span"); VTITLES+=("$title"); AVOID+=(--avoid "$span")
+  done < <("$PY" "$ROOT/lib/pick.py" "$WORK/full.srt" --n "$AUTOV" --lang "$LANG_" --kind video | tee /dev/stderr)
+  [ ${#VSPANS[@]} -gt 0 ] || echo "  ! model found no usable long passage — add --video spans by hand"
+fi
+
 if [ "$AUTO" -gt 0 ] && [ ${#SPANS[@]} -eq 0 ]; then
   log "Choosing $AUTO moments (local model)"
+  LEN=(); case " $DESTS " in *" whatsapp "*) LEN=(--min 20 --max 28);; esac
   while IFS= read -r line; do
     [ "${line:0:6}" = "--clip" ] || continue
     span="$(echo "$line" | awk '{print $2}')"
     title="$(echo "$line" | sed 's/^--clip [^ ]* //; s/^"//; s/"$//')"
     SPANS+=("$span"); TITLES+=("$title")
-  done < <("$PY" "$ROOT/lib/pick.py" "$WORK/full.srt" --n "$AUTO" --lang "$LANG_" | tee /dev/stderr)
+  done < <("$PY" "$ROOT/lib/pick.py" "$WORK/full.srt" --n "$AUTO" --lang "$LANG_" ${LEN[@]+"${LEN[@]}"} \
+             ${AVOID[@]+"${AVOID[@]}"} | tee /dev/stderr)
   [ ${#SPANS[@]} -gt 0 ] || { echo "model picked nothing usable — pick by hand"; exit 1; }
 fi
-
 # ── 4. no spans yet? print the transcript and stop ───────────────────────────
 if [ ${#SPANS[@]} -eq 0 ] && [ ${#VSPANS[@]} -eq 0 ]; then
   log "Transcript — pick your moments, then re-run with --clip MM:SS-MM:SS \"Title\""
@@ -156,8 +180,16 @@ PY
 
 # cut_and_transcribe <base> <start-s> <end-s> <words-per-caption-line>
 # Cached on the file names: delete <base>_src.mp4 to re-cut, <base>.srt to re-transcribe.
+# <base>.span remembers the span behind the name; a different span (new picks, moved edge)
+# throws the cut, its transcripts and its copy file away rather than reusing the old moment.
 cut_and_transcribe() {
   local base="$1" start="$2" end="$3" words="$4" stem; stem="$(basename "$base")"
+  if [ -f "${base}.span" ] && [ "$(cat "${base}.span")" != "$start-$end" ]; then
+    echo "  span changed since last run: re-cutting"
+    rm -f "${base}_src.mp4" "${base}.srt" "${base}_sent.srt" "${base}.en.srt" \
+          "$WORK/youtube/${stem/clip_/short_}_${SLUG}.txt" "$WORK/youtube/${stem/clip_/short_}_${SLUG}.jpg"
+  fi
+  echo "$start-$end" > "${base}.span"
   [ -f "${base}_src.mp4" ] || ffmpeg -y -loglevel error -ss "$start" -to "$end" -i "$SOURCE" \
       -c:v libx264 -crf 18 -preset medium -c:a aac -b:a 192k "${base}_src.mp4"
   if [ ! -f "${base}.srt" ]; then
@@ -188,7 +220,7 @@ for span in ${VSPANS[@]+"${VSPANS[@]}"}; do
   "$PY" "$ROOT/lib/polish.py" "${base}_src.mp4" --work "$WORK" --srt "${base}.srt" \
     --title "$title" --format landscape --out "$WORK/youtube/$name"
   "$PY" "$ROOT/lib/yt_copy.py" "$WORK/youtube/$name" --title "$title" \
-    --srt "${base}_sent.srt" --source "$WORK/source.json"
+    --srt "${base}_sent.srt" --source "$WORK/source.json" --lang "$LANG_"
   i=$((i+1))
 done
 
@@ -222,7 +254,7 @@ for span in ${SPANS[@]+"${SPANS[@]}"}; do
   # Title, description draft, tags and thumbnail beside the clip, for bin/yt-upload.sh.
   # Written once; a hand-edited .txt survives a re-render.
   "$PY" "$ROOT/lib/yt_copy.py" "$WORK/youtube/$name" --title "$title" \
-    --srt "${base}_sent.srt" --source "$WORK/source.json"
+    --srt "${base}_sent.srt" --source "$WORK/source.json" --lang "$LANG_"
   want facebook && link_or_copy "$WORK/youtube/$name" "$WORK/facebook/$name"
   want telegram && link_or_copy "$WORK/youtube/$name" "$WORK/telegram/$name"
   want whatsapp && "$PY" "$ROOT/lib/shrink.py" "$WORK/youtube/$name" --preset whatsapp --out "$WORK/whatsapp/$name"
@@ -240,7 +272,16 @@ for d in $DESTS; do
   for f in "$WORK/$d"/*.mp4; do [ -f "$f" ] && printf '  %-9s %s (%s)\n' "$d" "$(basename "$f")" "$(du -h "$f" | cut -f1)"; done
 done
 echo
-echo "Next: read youtube/*.txt (title, description, tags), fix the Croatian in clip_N.srt if needed,"
-echo "then  bin/yt-upload.sh $WORK"
+if [ "$UPLOAD" = 1 ]; then
+  log "Uploading to YouTube"
+  "$ROOT/bin/yt-upload.sh" "$WORK"
+  echo
+  echo "Captions and copy were machine-made. If a Short needs a fix: edit clip_N.srt or"
+  echo "youtube/short_N_*.txt, re-run the same command (cut and transcript are cached), and"
+  echo "replace the video in Studio, or delete it there and remove its line from uploaded.json."
+else
+  echo "Next: read youtube/*.txt (title, description, tags), fix the Croatian in clip_N.srt if needed,"
+  echo "then  bin/yt-upload.sh $WORK"
+fi
 echo "Rights: if this is a broadcaster's footage it stays theirs — publish as --mode appearance"
 echo "(text + link, no re-upload) unless you have written permission. See step 0 of the docs."

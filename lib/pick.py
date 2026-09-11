@@ -2,9 +2,12 @@
 """Choose the clippable moments in a transcript, and title each one.
 
     python pick.py work/<slug>/full.srt --n 3 --lang hr
+    python pick.py work/<slug>/full.srt --n 2 --lang hr --kind video
 
-Writes picks.json next to the transcript and prints one `--clip MM:SS-MM:SS "Title"` line per
-moment, ready to paste into (or be consumed by) bin/clip.sh.
+Writes picks.json (or picks_video.json) next to the transcript and prints one
+`--clip MM:SS-MM:SS "Title"` line per moment (`--video ...` with --kind video), ready to paste
+into (or be consumed by) bin/clip.sh. --kind video looks for three-to-five-minute passages on
+one theme, for a normal 16:9 upload rather than a Short.
 
 Runs on the local Ollama model from config.yaml. No key, no API, nothing leaves the machine —
 but it does need the model named in config.yaml to be pulled first.
@@ -34,7 +37,7 @@ TEMPLATE = """Transcript of a TV interview, one line per cue, timestamps are MM:
 
 {transcript}
 
-Choose the single best moment in this passage to cut as a standalone vertical short video.
+Choose the single best moment in this passage to cut as a standalone {what}.
 
 Give only the timestamp where each moment BEGINS. Do not give an end time; the clip is
 extended automatically to the end of the thought. So pick the line where the speaker starts
@@ -45,8 +48,9 @@ Rules:
 - prefer a concrete claim, number or quotation over generalities
 - ignore anything that reads like a transcription error, and never put such a word in a title
 
-For each write two titles, each a short claim of at most 6 words, the thing that makes someone
-stop scrolling. Not a topic label, no quotation marks, sentence case not Title Case.
+For each write two titles, each a bold, provocative claim of at most 8 words, the thing that
+makes someone stop scrolling: the speaker's sharpest sentence, sharpened. Not a topic label,
+no quotation marks, sentence case not Title Case.
   title     written in {language}, and ONLY in {language}
   title_en  the same claim written in English
 
@@ -54,6 +58,15 @@ Answer with JSON only:
 {{"clips": [{{"start": "MM:SS", "title": "...", "title_en": "...", "why": "one sentence"}}]}}"""
 
 LANGUAGES = {"hr": "Croatian", "en": "English", "fr": "French", "de": "German"}
+
+# What the model is asked for, and how long the span may be, per kind of output.
+KINDS = {
+    "short": dict(what="vertical short video of one idea, under a minute and a quarter",
+                  flag="--clip", gap=90, picks="picks.json"),
+    "video": dict(what="normal 16:9 video of three to five minutes: one theme, developed from "
+                       "its first sentence to its conclusion, no host question inside it",
+                  flag="--video", gap=300, picks="picks_video.json"),
+}
 
 
 def load_cues(srt: Path) -> list[tuple[float, float, str]]:
@@ -111,8 +124,10 @@ def snap(cues: list[tuple[float, float, str]], anchor: float, lo: int, hi: int):
     return start, cues[j][1]
 
 
-def validate(clips: list[dict], cues, duration: float, lo: int, hi: int) -> list[dict]:
-    """Drop what the model got wrong: bad stamps, overlaps, anything past the end."""
+def validate(clips: list[dict], cues, duration: float, lo: int, hi: int,
+             gap: int = MIN_GAP, avoid: list[tuple[float, float]] = ()) -> list[dict]:
+    """Drop what the model got wrong: bad stamps, overlaps, anything past the end, and
+    anything inside a span already taken (a Short cut out of the middle of a video)."""
     good: list[dict] = []
     for c in clips:
         anchor = to_secs(str(c.get("start", "")))
@@ -123,7 +138,9 @@ def validate(clips: list[dict], cues, duration: float, lo: int, hi: int) -> list
         st, en = snap(cues, anchor, lo, hi)
         if en - st < lo * 0.6:
             continue
-        if any(abs(st - g["start_s"]) < MIN_GAP for g in good):
+        if any(abs(st - g["start_s"]) < gap for g in good):
+            continue
+        if any(st < b and en > a_ for a_, b in avoid):
             continue
         good.append({"start": f"{int(st // 60):02d}:{int(st % 60):02d}",
                      "end": f"{int(en // 60):02d}:{int(en % 60):02d}",
@@ -138,11 +155,24 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--lang", default="hr")
     # 45-75s is the rule of thumb in the docs, and it is right for a YouTube Short. But one
-    # span feeds both renders, and WhatsApp Status refuses anything over 30s — so 30s binds,
-    # and a span that respects it is never trimmed mid-sentence afterwards.
-    ap.add_argument("--min", type=int, default=20)
-    ap.add_argument("--max", type=int, default=28)
+    # span feeds every render, and WhatsApp Status refuses anything over 30s — so when the
+    # WhatsApp cut is wanted, bin/clip.sh passes --min 20 --max 28 and that binds instead.
+    ap.add_argument("--kind", choices=KINDS, default="short")
+    ap.add_argument("--min", type=int, default=None, help="shortest span, s (45 short, 180 video)")
+    ap.add_argument("--max", type=int, default=None, help="longest span, s (75 short, 300 video)")
+    ap.add_argument("--avoid", action="append", default=[], metavar="MM:SS-MM:SS",
+                    help="span already used (a --video), never pick inside it")
     a = ap.parse_args()
+    avoid = []
+    for span in a.avoid:
+        x, y = span.split("-", 1)
+        if to_secs(x) is not None and to_secs(y) is not None:
+            avoid.append((to_secs(x), to_secs(y)))
+    kind = KINDS[a.kind]
+    if a.min is None:
+        a.min = 45 if a.kind == "short" else 180
+    if a.max is None:
+        a.max = 75 if a.kind == "short" else 300
 
     srt = Path(a.srt)
     cues = load_cues(srt)
@@ -161,7 +191,7 @@ def main() -> None:
                           if lo_t <= to_secs(line[:5]) < hi_t) if text else ""
         if not part.strip():
             continue
-        prompt = TEMPLATE.format(transcript=part, n=1, lo=a.min, hi=a.max,
+        prompt = TEMPLATE.format(transcript=part, what=kind["what"],
                                  language=LANGUAGES.get(a.lang, a.lang))
         try:
             raw = ollama(prompt, system=SYSTEM, json_mode=True)
@@ -174,14 +204,14 @@ def main() -> None:
         except json.JSONDecodeError:
             print(f"  window {k + 1}: model did not return JSON, skipped")
 
-    picks = validate(clips, cues, duration, a.min, a.max)
+    picks = validate(clips, cues, duration, a.min, a.max, kind["gap"], avoid)
     if not picks:
         raise SystemExit("nothing usable came back — pick by hand from the transcript instead")
 
-    write_json(srt.parent / "picks.json", {"clips": picks})
+    write_json(srt.parent / kind["picks"], {"clips": picks})
     for p in picks:
-        print(f'--clip {p["start"]}-{p["end"]} "{p["title"]} || {p["title_en"]}"')
-    print(f"\n  {len(picks)} of {a.n} kept → {srt.parent / 'picks.json'}")
+        print(f'{kind["flag"]} {p["start"]}-{p["end"]} "{p["title"]} || {p["title_en"]}"')
+    print(f"\n  {len(picks)} of {a.n} kept → {srt.parent / kind['picks']}")
     for p in picks:
         print(f'  {p["start"]}-{p["end"]}  {p["title"]} / {p["title_en"]}')
 
