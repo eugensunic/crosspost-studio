@@ -23,6 +23,12 @@ Every clip is rendered **twice** and filed into one folder per destination under
 
 The spoken-language folders are hard links to one file, so the copies are free.
 
+**The spoken language decides the language of everything.** Tom speaks Croatian, French,
+German and English on YouTube. `bin/clip.sh` detects the language from the audio
+(`lib/detect_lang.py`, remembered in `work/<folder>/lang`) and the captions, title card,
+title, description and tags all follow it. A French talk gets French copy, never Croatian.
+`--lang` overrides the detection when it is wrong. [2026-09-12]
+
 Substack is English throughout: burned-in subtitles, the title card on the video, and the post.
 Never substitute the Croatian cut, and never ship only one of the two. `bin/clip.sh` does both.
 

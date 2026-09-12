@@ -41,12 +41,12 @@ PY="${PYTHON:-$ROOT/.venv/bin/python}"
 [ -x "$PY" ] || PY="python3"
 export PYTHONPATH="$ROOT/lib"
 
-SRC=""; SLUG=""; LANG_="hr"; AUTO=0; AUTOV=0; UPLOAD=0; POSTOP=(); SPANS=(); TITLES=(); VSPANS=(); VTITLES=()
+SRC=""; SLUG=""; LANG_="auto"; AUTO=0; AUTOV=0; UPLOAD=0; POSTOP=(); SPANS=(); TITLES=(); VSPANS=(); VTITLES=()
 DESTS="youtube facebook telegram whatsapp substack"
 while [ $# -gt 0 ]; do
   case "$1" in
     --slug)  SLUG="$2"; shift 2;;
-    --lang)  LANG_="$2"; shift 2;;
+    --lang)  LANG_="$2"; shift 2;;                 # hr, fr, de, en; default: detected from the audio
     --dest)  DESTS="$(echo "$2" | tr ',' ' ')"; shift 2;;   # e.g. --dest youtube
     --clip)  SPANS+=("$2"); TITLES+=("${3:-}"); shift 3;;
     --video) VSPANS+=("$2"); VTITLES+=("${3:-}"); shift 3;;  # 16:9, not a Short
@@ -92,6 +92,15 @@ else
   else
     echo "  cached: $SOURCE"
   fi
+fi
+
+# ── 1b. which language is spoken ────────────────────────────────────────────
+# The spoken language decides everything downstream: captions, title card, title,
+# description, tags. Detected once from the audio and remembered in the work folder.
+if [ "$LANG_" = "auto" ]; then
+  if [ -s "$WORK/lang" ]; then LANG_="$(cat "$WORK/lang")"
+  else LANG_="$("$PY" "$ROOT/lib/detect_lang.py" "$SOURCE")"; echo "$LANG_" > "$WORK/lang"; fi
+  echo "  spoken language: $LANG_"
 fi
 
 # ── 2. transcribe the whole thing ────────────────────────────────────────────

@@ -45,6 +45,13 @@ Write, in {language}:
 Answer with JSON only: {{"description": "...", "tags": ["...", "..."]}}"""
 
 LANGUAGES = {"hr": "Croatian", "en": "English", "fr": "French", "de": "German"}
+# The two fixed lines under the description, in the spoken language.
+STRINGS = {
+    "hr": ("Cijeli razgovor", "Izvor"),
+    "en": ("Full talk", "Source"),
+    "fr": ("Intervention complète", "Source"),
+    "de": ("Ganzer Beitrag", "Quelle"),
+}
 
 
 def describe(title: str, body: str, who: str, lang: str) -> tuple[str, list[str]]:
@@ -140,15 +147,16 @@ def main() -> None:
     if not body:
         body = sentences(Path(a.srt)) if a.srt and Path(a.srt).exists() else ""
     lines = [body] if body else []
+    full_lbl, src_lbl = STRINGS.get(a.lang, STRINGS["en"])
     if src.get("page"):
-        lines.append(f"Cijeli razgovor: {src['page']}")
+        lines.append(f"{full_lbl}: {src['page']}")
     # Broadcaster, show and date. The upload's own title only when it is short; a long one
     # ("RENDEZVOUS - TOMISLAV SUNIĆ - ... (5.5.2026.)") is noise in a credit line.
     src_title = src.get("title", "") if len(src.get("title", "")) <= 60 else ""
     credit = ", ".join(x for x in (src.get("uploader", ""), a.programme or src_title,
                                    date_hr(src.get("date", ""))) if x)
     if credit:
-        lines.append(f"Izvor: {credit}")
+        lines.append(f"{src_lbl}: {credit}")
     tags = (model_tags or keywords(f"{a.title} {body}")) + ([show] if show else []) + CHANNEL_TAGS
     hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9ČĆĐŠŽčćđšž]", "", t.title()) for t in tags[:4])
     # #Shorts only on the vertical cut; a video_N_ file is a normal 16:9 upload.
