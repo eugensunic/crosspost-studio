@@ -1,4 +1,6 @@
 # Commands
+cd ~/Desktop/crosspost-studio
+bin/yt.sh "https://www.youtube.com/watch?v=VIDEO_ID"
 
 The short list. `README.md` is the full operator's manual, `POLISHING.md` the rules a clip has
 to meet, `CLAUDE.md` the working conventions.
