@@ -57,8 +57,24 @@ while [ $# -gt 0 ]; do
     *) [ -z "$SRC" ] && SRC="$1" && shift || { echo "unexpected arg: $1"; exit 1; };;
   esac
 done
-[ -n "$SRC" ] && [ -n "$SLUG" ] || { sed -n '2,18p' "$0"; exit 1; }
+[ -n "$SRC" ] || { sed -n '2,18p' "$0"; exit 1; }
 
+# No --slug: make one from the video's title (a file: from its name). It is only the folder
+# and file name on this disk, never shown anywhere.
+if [ -z "$SLUG" ]; then
+  if [ -f "$SRC" ]; then raw="$(basename "${SRC%.*}")"
+  else raw="$(yt-dlp --skip-download --print title "$SRC" 2>/dev/null | head -1 || true)"; fi
+  SLUG="$("$PY" - "$raw" <<'PY'
+import re, sys, unicodedata
+t = unicodedata.normalize("NFKD", sys.argv[1]).encode("ascii", "ignore").decode().lower()
+t = re.sub(r"\(.*?\)|\[.*?\]|\d{1,2}\.\d{1,2}\.\d{2,4}\.?", " ", t)
+t = re.sub(r"\b(dr|tomislav|tom|sunic|rendezvous|intervju|interview|gost|podcast|emisija)\b", " ", t)
+words = [w for w in re.split(r"[^a-z0-9]+", t) if len(w) > 1][:5]
+print("-".join(words) or "video")
+PY
+)"
+  echo "  folder: work/$(date +%Y%m%d)-$SLUG"
+fi
 WORK="$ROOT/work/$(date +%Y%m%d)-$SLUG"; mkdir -p "$WORK"
 log() { printf '\n\033[1;34m▶ %s\033[0m\n' "$*"; }
 secs() { "$PY" -c "import sys;p=sys.argv[1].split(':');print(sum(float(x)*60**i for i,x in enumerate(reversed(p))))" "$1"; }

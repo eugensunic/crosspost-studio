@@ -3,9 +3,10 @@
 # five Shorts and two longer passages, cuts and captions them, writes title, description,
 # tags and thumbnail beside each, and uploads them (unlisted by default, see config.yaml).
 #
-#   bin/yt.sh "https://www.youtube.com/watch?v=..." --slug tito-diktator
-#   bin/yt.sh "<url>" --slug <name> --shorts 3 --videos 1
-#   bin/yt.sh "<url>" --slug <name> --no-upload        make everything, upload later by hand
+#   bin/yt.sh "https://www.youtube.com/watch?v=..."
+#   bin/yt.sh "<url>" --shorts 3 --videos 1
+#   bin/yt.sh "<url>" --no-upload        make everything, upload later by hand
+#   bin/yt.sh "<url>" --slug my-name     name the work folder yourself (default: from the title)
 #
 # Everything lands in work/<date>-<slug>/. The captions and the copy are machine-made: when
 # a clip needs a fix, edit clip_N.srt or youtube/short_N_<slug>.txt and run the same line

@@ -6,8 +6,12 @@ to meet, `CLAUDE.md` the working conventions.
 ## YouTube in one command
 
 ```
-bin/yt.sh "https://www.youtube.com/watch?v=YQoug8JTIGo" --slug tito-diktator
+bin/yt.sh "https://www.youtube.com/watch?v=YQoug8JTIGo"
 ```
+
+The link is the only input. The work folder is named from the video's title
+(`work/<date>-josip-broz-tito-anatomija-diktatora/` for that one); `--slug my-name` names it
+yourself.
 
 Downloads, transcribes, lets the local model pick five Shorts (45 to 75 s) and two longer
 passages (3 to 5 min, normal 16:9), cuts and captions them, writes title, description, tags
