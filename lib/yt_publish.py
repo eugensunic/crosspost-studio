@@ -38,7 +38,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from common import CFG, read_json, write_json
-from youtube_upload import service, upload, whoami
+from youtube_upload import service, set_thumbnail, upload, whoami
 
 SECTIONS = ("TITLE", "DESCRIPTION", "TAGS", "THUMBNAIL")
 
@@ -138,8 +138,7 @@ def main() -> None:
     for mp4, c, txt in todo:
         print(f"\n  ▶ {mp4.name}")
         try:
-            vid = upload(yt, mp4, c["TITLE"], c["DESCRIPTION"], c["TAGS"], a.privacy,
-                         txt.parent / c["THUMBNAIL"])
+            vid = upload(yt, mp4, c["TITLE"], c["DESCRIPTION"], c["TAGS"], a.privacy)
         except Exception as e:  # quota, network: keep the ledger for what did go out
             msg = str(e)
             if "quotaExceeded" in msg:
@@ -148,10 +147,13 @@ def main() -> None:
                 break
             print(f"  ! failed: {msg[:300]}")
             continue
+        # Record the upload before anything else touches it. Whatever goes wrong with the
+        # thumbnail, the video is already on YouTube and must never be uploaded twice.
         done[mp4.name] = {"id": vid, "url": f"https://www.youtube.com/watch?v={vid}",
                           "privacy": a.privacy, "title": c["TITLE"],
                           "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
         write_json(ledger, done)
+        set_thumbnail(yt, vid, txt.parent / c["THUMBNAIL"])
 
     print(f"\n  ledger: {ledger}")
     if a.privacy != "public":

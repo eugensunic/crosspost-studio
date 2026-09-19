@@ -81,7 +81,6 @@ def whoami(yt) -> dict:
 def upload(yt, f: Path, title: str, description: str, tags: list[str], privacy: str,
            thumbnail: Path | None = None) -> str:
     """Resumable upload, then the thumbnail. Returns the video id. Used by yt_publish.py too."""
-    from googleapiclient.errors import HttpError
     from googleapiclient.http import MediaFileUpload
 
     body = {"snippet": {"title": title[:100], "description": description,
@@ -100,17 +99,37 @@ def upload(yt, f: Path, title: str, description: str, tags: list[str], privacy: 
     print(f"  uploaded: https://www.youtube.com/watch?v={vid}")
     print(f"  studio:   https://studio.youtube.com/video/{vid}/edit")
     if thumbnail:
-        # 50 quota units. Fails with "forbidden" on a channel that has not verified a phone
-        # number; the upload itself is unaffected, so report rather than raise.
-        try:
-            yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(
-                str(thumbnail), mimetype="image/jpeg"
-                if thumbnail.suffix.lower() in (".jpg", ".jpeg") else "image/png")).execute()
-            print(f"  thumbnail: {thumbnail.name}")
-        except HttpError as e:
-            print(f"  ! thumbnail not set ({e.resp.status}): verify the channel's phone number "
-                  f"in YouTube Studio, then set it by hand")
+        set_thumbnail(yt, vid, thumbnail)
     return vid
+
+
+def set_thumbnail(yt, vid: str, thumbnail: Path) -> bool:
+    """Set the thumbnail on an uploaded video. Reports problems, never raises.
+
+    The video is already on YouTube by the time this runs, so nothing here may look like a
+    failed upload: a raise would skip the ledger and a re-run would upload the file twice.
+    Costs 50 quota units.
+    """
+    from googleapiclient.errors import HttpError
+    from googleapiclient.http import MediaFileUpload
+
+    if not thumbnail.is_file():
+        print(f"  ! thumbnail not set: {thumbnail} does not exist (did the folder move while "
+              f"uploading?). Set it by hand in Studio.")
+        return False
+    try:
+        yt.thumbnails().set(videoId=vid, media_body=MediaFileUpload(
+            str(thumbnail), mimetype="image/jpeg"
+            if thumbnail.suffix.lower() in (".jpg", ".jpeg") else "image/png")).execute()
+        print(f"  thumbnail: {thumbnail.name}")
+        return True
+    except HttpError as e:
+        # "forbidden" on a channel that has not verified a phone number.
+        print(f"  ! thumbnail not set ({e.resp.status}): verify the channel's phone number "
+              f"in YouTube Studio, then set it by hand")
+    except OSError as e:
+        print(f"  ! thumbnail not set: {e}. Set it by hand in Studio.")
+    return False
 
 
 def main() -> None:
