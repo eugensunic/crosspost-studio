@@ -91,6 +91,8 @@ retitling produces a derivative work, which still needs their permission.
   of the picture above and below was rejected on 2026-09-19; a Short looks like a normal Short.
 * **Default counts are 3 Shorts and 3 normal videos per source.** `bin/yt.sh` does that without
   flags; `--shorts N --videos N` change it. [2026-09-19]
+* **"Do this video" means the whole process, upload included.** Review captions and copy before
+  `bin/yt-upload.sh`, then run it; never stop with the clips on disk and ask. [2026-09-19]
 
 ## Credentials
 
