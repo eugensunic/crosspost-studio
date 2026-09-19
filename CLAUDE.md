@@ -86,8 +86,11 @@ retitling produces a derivative work, which still needs their permission.
   `lib/translate_srt.py`, which needs Ollama and a pulled model.
 * **python-substack cannot upload video.** `Post.youtube()` embeds by id and `get_image()` does
   images, and that is all. The video goes to YouTube first and the post embeds it.
-* **Never centre-crop to 9:16.** On a wide two-shot the centre strip contains neither speaker.
-  The vertical fit is a blurred pad, so nothing is ever cropped out.
+* **Never centre-crop to 9:16, and never a blurred pad.** On a wide two-shot the centre strip
+  contains neither speaker, so the whole frame is letterboxed over plain black. The blurred copy
+  of the picture above and below was rejected on 2026-09-19; a Short looks like a normal Short.
+* **Default counts are 3 Shorts and 3 normal videos per source.** `bin/yt.sh` does that without
+  flags; `--shorts N --videos N` change it. [2026-09-19]
 
 ## Credentials
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One command, link in, YouTube videos out. Downloads, transcribes, lets the local model pick
-# five Shorts and two longer passages, cuts and captions them, writes title, description,
+# three Shorts and three longer passages, cuts and captions them, writes title, description,
 # tags and thumbnail beside each, and uploads them (unlisted by default, see config.yaml).
 #
 #   bin/yt.sh "https://www.youtube.com/watch?v=..."
@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [ $# -gt 0 ] || { sed -n '2,12p' "$0"; exit 1; }
 SRC="$1"; shift
-SHORTS=5; VIDEOS=2; UPLOAD=(--upload); REST=()
+SHORTS=3; VIDEOS=3; UPLOAD=(--upload); REST=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --shorts) SHORTS="$2"; shift 2;;

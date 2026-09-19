@@ -15,13 +15,13 @@ The link is the only input. The work folder is named from the video's title
 (`work/<date>-josip-broz-tito-anatomija-diktatora/` for that one); `--slug my-name` names it
 yourself.
 
-Downloads, transcribes, lets the local model pick five Shorts (45 to 75 s) and two longer
+Downloads, transcribes, lets the local model pick three Shorts (45 to 75 s) and three longer
 passages (3 to 5 min, normal 16:9), cuts and captions them, writes title, description, tags
 and thumbnail beside each, and uploads them unlisted. `--shorts 3 --videos 1` changes the
 count, `--no-upload` stops before the upload so the copy can be read first, and anything else
 (`--lang`, `--clip`, `--video`) is passed through to `bin/clip.sh`.
 
-It is the same as the two commands below with `--auto 5 --auto-videos 2 --dest youtube
+It is the same as the two commands below with `--auto 3 --auto-videos 3 --dest youtube
 --upload`, so everything said there about the work folder, the ledger and the quota holds.
 What it does not do is judge: the local model is a mediocre picker and its Croatian is rough,
 so the description is a draft written by it, not a transcript dump, and a wrong word in

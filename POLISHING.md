@@ -46,7 +46,7 @@ Most feed playback is muted. A clip with no on-screen text is a clip nobody watc
 
 * Spoken-language subtitles, burned in — not a sidecar file, which no network displays in-feed.
 * Three words a line, so each card is readable at a glance.
-* Placed in the blurred band **below** the video, never across a face.
+* Placed in the black band **below** the video, never across a face.
 * White, heavy weight, thick black outline, so they survive a bright frame.
 
 **Spot-check the Croatian before it goes out.** Whisper is the quality floor for everything downstream
@@ -58,7 +58,7 @@ and it makes real mistakes — this clip alone had `suštavu` for `sustav`, `uzr
 The viewer decides in about two seconds. Give them the claim in text before they have heard a sentence.
 
 * Appears at 0.3 s, holds ~3.6 s, fades out.
-* `--title-pos band` (default) puts it in the blurred band **above** the picture; `--title-pos over`
+* `--title-pos band` (default) puts it in the black band **above** the picture; `--title-pos over`
   puts it **on** the picture. Band is usually better on interview footage — a title over the picture
   lands on the speaker's head, because that is exactly where a framed head sits.
 * Short enough to read — if it wraps past three lines it is not a title, it is a sentence.
@@ -67,7 +67,7 @@ The viewer decides in about two seconds. Give them the claim in text before they
 
 ## Framing: never centre-crop a two-shot
 
-The vertical fit is a **blurred pad**: the whole frame is placed over a scaled, blurred copy of itself.
+The vertical fit is a **black pad**: the whole frame is scaled to the canvas width and letterboxed over plain black. No blurred copy of the picture above or below; the user rejected that look on 19 September 2026.
 Nothing is ever cropped out.
 
 The tempting alternative — crop the middle 9:16 out of a 16:9 frame — throws away 58% of the width and

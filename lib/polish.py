@@ -5,7 +5,7 @@
 
 Does, in order:
   1. finds screen-recorder junk (player control bar, mouse cursor, scrub tooltips) and removes it
-  2. fits the whole frame into 1080x1920 over a blurred copy of itself — nothing is ever cropped off
+  2. fits the whole frame into 1080x1920 over plain black — nothing is ever cropped off
   3. burns the subtitles in, so it reads with the sound off
   4. holds the title over the opening seconds
 
@@ -327,12 +327,8 @@ def build(src: Path, out: Path, cues, title: str, tmp: Path, bar_top: int | None
     else:
         chain.append(f"{prev}null[cd]")
 
-    # 2. 1080x1920 over a blurred copy — nothing is cropped out of frame
-    chain.append("[cd]split=2[bg][fg]")
-    chain.append(f"[bg]scale={OUT_W}:{OUT_H}:force_original_aspect_ratio=increase,"
-                 f"crop={OUT_W}:{OUT_H},gblur=sigma=40[bgb]")
-    chain.append(f"[fg]scale={OUT_W}:-2[fgs]")
-    chain.append("[bgb][fgs]overlay=(W-w)/2:(H-h)/2,setsar=1[v0]")
+    # 2. 1080x1920 over plain black — nothing is cropped out of frame, no blurred pad
+    chain.append(f"[cd]scale={OUT_W}:-2,pad={OUT_W}:{OUT_H}:0:(oh-ih)/2:black,setsar=1[v0]")
 
     # 3. subtitles
     for i, (st, en, text) in enumerate(cues):
@@ -382,7 +378,7 @@ def main() -> None:
     ap.add_argument("--srt-offset", type=float, default=0.0,
                     help="seconds into the source this clip starts, for rebasing subtitles")
     ap.add_argument("--title-pos", choices=["band", "over"], default="band",
-                    help="band: in the blurred area above the picture; over: on the picture")
+                    help="band: in the black band above the picture; over: on the picture")
     ap.add_argument("--no-clean", action="store_true", help="skip overlay removal")
     ap.add_argument("--format", choices=sorted(FORMATS), default="short",
                     help="short: 1080x1920 vertical; landscape: 1920x1080 normal video")

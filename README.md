@@ -21,7 +21,7 @@ lib/
   translate_srt.py      hr.srt → en/fr/de.srt via local Ollama, timing preserved
   titles.py             transcript → meta.json (bilingual title, descriptions, X/LinkedIn texts, chapters, Short spans)
   grab.py               article URL → local video + source.json (title, date, page) — provenance, not permission
-  polish.py             raw clip → finished 1080x1920 short: removes cursor/player chrome, blurred 9:16 pad,
+  polish.py             raw clip → finished 1080x1920 short: removes cursor/player chrome, black 9:16 pad,
                         burned-in subtitles, opening title card — one ffmpeg pass (see POLISHING.md)
   appearance.py         link → appearance.json (oEmbed title/embed, LLM announcement) — never downloads video
   postiz.py             uploads media, builds one posts.json for every network, POSTs to Postiz (weekly slot)
@@ -59,7 +59,7 @@ tests/test_dry_run.sh   offline smoke test
 | 2 transcribe | mlx-whisper large-v3-turbo | hr.srt, transcript.txt |
 | 3 translate | Ollama gemma3:12b | en.srt fr.srt de.srt |
 | 4 titles | Ollama | meta.json (bilingual title, descriptions, X/LinkedIn text, chapters, Short spans) |
-| 5 shorts | lib/polish.py — clean, blurred 9:16 pad, burned-in subtitles, title card | short_1.mp4 short_2.mp4 thumb.jpg |
+| 5 shorts | lib/polish.py — clean, black 9:16 pad, burned-in subtitles, title card | short_1.mp4 short_2.mp4 thumb.jpg |
 | 6 publish | Postiz public API | posts.json → YouTube (long + Shorts), X, LinkedIn, Facebook, Instagram, Telegram, scheduled to the weekly slot |
 | 7 captions | YouTube Data API | subtitle tracks HR/EN/FR/DE + HR/EN localizations (needs `--video-id`) |
 | 8 site + newsletter | MkDocs, python-substack | posts/<slug>.md, Substack draft (he clicks Publish), WhatsApp line printed |
