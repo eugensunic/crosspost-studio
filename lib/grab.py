@@ -54,9 +54,13 @@ def meta(html: str) -> dict:
             m = re.search(rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:{prop}["\']', html, re.I)
         return m.group(1).strip() if m else ""
 
+    def site_name() -> str:
+        m = re.search(r'<meta[^>]+property=["\']og:site_name["\'][^>]+content=["\']([^"\']+)', html, re.I)
+        return m.group(1).strip() if m else ""
+
     date = re.search(r'"datePublished"\s*:\s*"([^"]+)"', html)
     return {"title": og("title"), "description": og("description"),
-            "date": date.group(1) if date else ""}
+            "date": date.group(1) if date else "", "uploader": site_name()}
 
 
 def is_platform(url: str) -> bool:

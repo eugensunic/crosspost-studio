@@ -102,11 +102,14 @@ def keywords(text: str, n: int = 8) -> list[str]:
     return [k for k in ranked[:n]]
 
 
-def date_hr(yyyymmdd: str) -> str:
-    try:
-        return datetime.strptime(yyyymmdd[:8], "%Y%m%d").strftime("%d.%m.%Y.")
-    except ValueError:
-        return yyyymmdd
+def date_hr(raw: str) -> str:
+    # yt-dlp gives 20260920; a scraped article gives an ISO datePublished.
+    for fmt, cut in (("%Y%m%d", 8), ("%Y-%m-%d", 10)):
+        try:
+            return datetime.strptime(raw[:cut], fmt).strftime("%d.%m.%Y.")
+        except ValueError:
+            continue
+    return raw
 
 
 def thumbnail(mp4: Path, out: Path, at: float = 1.6) -> None:
